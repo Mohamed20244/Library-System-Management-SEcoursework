@@ -4,22 +4,18 @@
 #include <string>
 #include <ctime>
 #include <iomanip>
-#include <limits> // Add this include for numeric_limits
+#include <limits>
+#include <sstream>
+#include <algorithm>
 
-class Book;
-class Member;
-class Library;
-
+// Class representing a person
 class Person {
 public:
     Person(std::string name, std::string address, std::string email);
     virtual ~Person();
-    virtual std::string getName();
-    virtual void setName(std::string name);
-    virtual std::string getAddress();
-    virtual void setAddress(std::string address);
-    virtual std::string getEmail();
-    virtual void setEmail(std::string email);
+    virtual std::string getName() const;
+    virtual std::string getAddress() const;
+    virtual std::string getEmail() const;
 
 private:
     std::string name;
@@ -27,28 +23,36 @@ private:
     std::string email;
 };
 
+// Class representing a library member, inheriting from Person
 class Member : public Person {
 public:
     Member(int memberID, std::string name, std::string address, std::string email);
-    int getMemberID();
-    std::vector<Book*> getBooksBorrowed();
-    void setBooksBorrowed(Book* book);
+    int getMemberID() const;
+    const std::vector<int>& getBooksBorrowed() const;
+    void setBooksBorrowed(int bookID);
+    void returnBook(int bookID);
 
 private:
     int memberID;
-    std::vector<Book*> booksBorrowed;
+    std::vector<int> booksBorrowed;
 };
 
+// Class representing a book
 class Book {
 public:
     Book(int bookID, std::string bookName, std::string authorFirstName, std::string authorLastName);
-    int getBookID();
-    std::string getBookName();
-    std::string getAuthorFirstName();
-    std::string getAuthorLastName();
-    void setDueDate();
+    int getBookID() const;
+    std::string getBookDetails() const;
     void returnBook();
-    void borrowBook(Member* borrower, time_t dueDate);
+    void borrowBook(Member& borrower, time_t dueDate);
+
+    Member* getBorrower() const {
+        return borrower;
+    }
+
+    time_t getDueDate() const {
+        return dueDate;
+    }
 
 private:
     int bookID;
@@ -59,17 +63,21 @@ private:
     Member* borrower;
 };
 
+// Class representing a library
 class Library {
 public:
     void addMember(std::string name, std::string address, std::string email);
     void issueBook(int memberID, int bookID);
     void returnBook(int memberID, int bookID);
-    void displayBorrowedBooks(int memberID);
-    void calcFine(int memberID);
+    void displayBorrowedBooks(int memberID) const;
+    void calcFine(int memberID) const;
+    void populateLibraryFromFile(const std::string& filename);
 
-private:
     std::vector<Member*> members;
     std::vector<Book*> books;
+
+private:
+    // ... (private member functions if needed)
 };
 
 Person::Person(std::string name, std::string address, std::string email)
@@ -77,100 +85,112 @@ Person::Person(std::string name, std::string address, std::string email)
 
 Person::~Person() {}
 
-std::string Person::getName() {
+std::string Person::getName() const {
     return name;
 }
 
-void Person::setName(std::string name) {
-    this->name = name;
-}
-
-std::string Person::getAddress() {
+std::string Person::getAddress() const {
     return address;
 }
 
-void Person::setAddress(std::string address) {
-    this->address = address;
-}
-
-std::string Person::getEmail() {
+std::string Person::getEmail() const {
     return email;
-}
-
-void Person::setEmail(std::string email) {
-    this->email = email;
 }
 
 Member::Member(int memberID, std::string name, std::string address, std::string email)
     : Person(name, address, email), memberID(memberID) {}
 
-int Member::getMemberID() {
+int Member::getMemberID() const {
     return memberID;
 }
 
-std::vector<Book*> Member::getBooksBorrowed() {
+const std::vector<int>& Member::getBooksBorrowed() const {
     return booksBorrowed;
 }
 
-void Member::setBooksBorrowed(Book* book) {
-    booksBorrowed.push_back(book);
+// Add a book to the list of books borrowed by a member
+void Member::setBooksBorrowed(int bookID) {
+    booksBorrowed.push_back(bookID);
+}
+
+// Remove a book from the list of books borrowed by a member
+void Member::returnBook(int bookID) {
+    for (auto it = booksBorrowed.begin(); it != booksBorrowed.end(); ++it) {
+        if (*it == bookID) {
+            booksBorrowed.erase(it);
+            std::cout << "Book returned successfully.\n";
+            return;
+        }
+    }
+    std::cout << "Book with ID " << bookID << " not found in the borrowed books list.\n";
 }
 
 Book::Book(int bookID, std::string bookName, std::string authorFirstName, std::string authorLastName)
     : bookID(bookID), bookName(bookName), authorFirstName(authorFirstName), authorLastName(authorLastName), borrower(nullptr) {}
 
-int Book::getBookID() {
+int Book::getBookID() const {
     return bookID;
 }
 
-std::string Book::getBookName() {
-    return bookName;
-}
-
-std::string Book::getAuthorFirstName() {
-    return authorFirstName;
-}
-
-std::string Book::getAuthorLastName() {
-    return authorLastName;
-}
-
-void Book::setDueDate() {
-    // Implement set due date logic
-    // This function needs to be filled based on your requirements
+std::string Book::getBookDetails() const {
+    return "Book ID: " + std::to_string(bookID) + ", Book Name: " + bookName + ", Author: " + authorFirstName + " " + authorLastName;
 }
 
 void Book::returnBook() {
-    // Implement return book logic
-    // This function needs to be filled based on your requirements
     borrower = nullptr;
+    dueDate = 0;
 }
 
-void Book::borrowBook(Member* borrower, time_t dueDate) {
-    this->borrower = borrower;
+void Book::borrowBook(Member& borrower, time_t dueDate) {
+    this->borrower = &borrower;
     this->dueDate = dueDate;
 }
 
+// Add a new member to the library
 void Library::addMember(std::string name, std::string address, std::string email) {
-    members.push_back(new Member(members.size() + 1, name, address, email));
+    Member* newMember = new Member(members.size() + 1, name, address, email);
+    members.push_back(newMember);
+
+    std::cout << "Member added successfully.\n";
+    std::cout << "Member details:\n";
+    std::cout << "ID: " << newMember->getMemberID() << ", Name: " << newMember->getName()
+              << ", Address: " << newMember->getAddress() << ", Email: " << newMember->getEmail() << "\n";
 }
 
+// Issue a book to a member
 void Library::issueBook(int memberID, int bookID) {
-    // Implement logic to issue a book to a member
-    // You may need to manage a collection of books and members in the library
-    // and update their states accordingly
-    std::cout << "Book issued successfully.\n";
+    Member* member = nullptr;
+    for (Member* m : members) {
+        if (m->getMemberID() == memberID) {
+            member = m;
+            break;
+        }
+    }
+
+    Book* book = nullptr;
+    for (Book* b : books) {
+        if (b->getBookID() == bookID) {
+            book = b;
+            break;
+        }
+    }
+
+    if (member == nullptr || book == nullptr) {
+        std::cout << "Member or Book not found. Unable to issue the book.\n";
+        return;
+    }
+
+    time_t currentTime = std::time(nullptr);
+    time_t dueDate = currentTime + 3 * 24 * 60 * 60;
+
+    book->borrowBook(*member, dueDate);
+    member->setBooksBorrowed(bookID);
+
+    std::cout << "Book issued successfully to Member " << memberID << ".\n";
+    std::cout << "Due Date: " << std::put_time(std::localtime(&dueDate), "%Y-%m-%d %H:%M:%S") << "\n";
 }
 
 void Library::returnBook(int memberID, int bookID) {
-    // Implement logic to return a book from a member
-    // You may need to manage a collection of books and members in the library
-    // and update their states accordingly
-    std::cout << "Book returned successfully.\n";
-}
-
-void Library::displayBorrowedBooks(int memberID) {
-    // Find the member with the given ID
     Member* member = nullptr;
     for (Member* m : members) {
         if (m->getMemberID() == memberID) {
@@ -184,25 +204,112 @@ void Library::displayBorrowedBooks(int memberID) {
         return;
     }
 
-    std::vector<Book*> borrowedBooks = member->getBooksBorrowed();
+    member->returnBook(bookID);
+
+    std::cout << "Book returned successfully by Member " << memberID << ".\n";
+}
+
+void Library::displayBorrowedBooks(int memberID) const {
+    Member* member = nullptr;
+    for (Member* m : members) {
+        if (m->getMemberID() == memberID) {
+            member = m;
+            break;
+        }
+    }
+
+    if (member == nullptr) {
+        std::cout << "Member with ID " << memberID << " not found.\n";
+        return;
+    }
+
+    const std::vector<int>& borrowedBooks = member->getBooksBorrowed();
 
     if (borrowedBooks.empty()) {
         std::cout << "Member " << memberID << " has not borrowed any books.\n";
     } else {
         std::cout << "Borrowed books for Member " << memberID << ":\n";
-        for (Book* book : borrowedBooks) {
-            std::cout << "Book ID: " << book->getBookID() << ", Book Name: " << book->getBookName() << "\n";
+        for (int bookID : borrowedBooks) {
+            for (const Book* book : books) {
+                if (book->getBookID() == bookID) {
+                    std::cout << book->getBookDetails() << "\n";
+                    break;
+                }
+            }
         }
     }
 }
 
-void Library::calcFine(int memberID) {
-    // Implement logic to calculate fine for overdue books
-    // You may need to manage a collection of books and members in the library
-    // and calculate fines based on due dates
-    std::cout << "Fine calculated successfully.\n";
+void Library::calcFine(int memberID) const {
+    Member* member = nullptr;
+    for (Member* m : members) {
+        if (m->getMemberID() == memberID) {
+            member = m;
+            break;
+        }
+    }
+
+    if (member == nullptr) {
+        std::cout << "Member with ID " << memberID << " not found.\n";
+        return;
+    }
+
+    const std::vector<int>& borrowedBooks = member->getBooksBorrowed();
+    if (borrowedBooks.empty()) {
+        std::cout << "Member " << memberID << " has not borrowed any books.\n";
+    } else {
+        time_t currentTime = std::time(nullptr);
+        bool finesCalculated = false;
+
+        for (int bookID : borrowedBooks) {
+            for (const Book* book : books) {
+                if (book->getBookID() == bookID && book->getBorrower() == member) {
+                    if (book->getDueDate() < currentTime) {
+                        int daysOverdue = static_cast<int>((currentTime - book->getDueDate()) / (24 * 60 * 60));
+                        int fine = daysOverdue * 1;
+
+                        std::cout << "Fine for Member " << memberID << " (Book ID " << bookID << "): £" << fine << "\n";
+                        finesCalculated = true;
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (!finesCalculated) {
+            std::cout << "No fine calculated for Member " << memberID << ".\n";
+        }
+    }
 }
 
+void Library::populateLibraryFromFile(const std::string& filename) {
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    std::string line;
+    std::getline(file, line);
+
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        int bookID;
+        std::string bookName, authorFirstName, authorLastName;
+
+        if (ss >> bookID >> std::ws && std::getline(ss, bookName, ',') &&
+            std::getline(ss, authorFirstName, ',') && std::getline(ss, authorLastName, ',')) {
+            books.push_back(new Book(bookID, bookName, authorFirstName, authorLastName));
+        } else {
+            std::cerr << "Error parsing line: " << line << std::endl;
+        }
+    }
+
+    file.close();
+}
+
+// Function to get user choice
 int getChoice() {
     int choice;
     std::cout << "\nLibrary Management System\n";
@@ -216,31 +323,18 @@ int getChoice() {
     std::cout << "Enter your choice: ";
 
     while (!(std::cin >> choice)) {
-        std::cin.clear();  // Clear error flag
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');  // Discard invalid input
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         std::cout << "Invalid input. Please enter a number: ";
     }
 
     return choice;
 }
 
+// Main function
 int main() {
     Library library;
-
-    std::ifstream myFile;
-    myFile.open("Excel.csv");
-
-    if (!myFile.is_open()) {
-        std::cerr << "Error opening file: Excel.csv" << std::endl;
-        return 1;
-    }
-
-    std::string line;
-    while (std::getline(myFile, line)) {
-        std::cout << line << std::endl;
-    }
-
-    myFile.close();
+    library.populateLibraryFromFile("Excel.csv");
 
     int choice;
     do {
@@ -248,21 +342,29 @@ int main() {
 
         switch (choice) {
             case 1: {
-                // Display Book by ID
                 int bookID;
                 std::cout << "Enter Book ID: ";
                 std::cin >> bookID;
 
-                // Implement logic to display book by ID
-                // Replace the following line with your actual logic
-                std::cout << "Book details for ID " << bookID << " will be displayed here.\n";
+                bool found = false;
+                for (Book* book : library.books) {
+                    if (book->getBookID() == bookID) {
+                        found = true;
+                        std::cout << "Book details:\n";
+                        std::cout << book->getBookDetails() << "\n";
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    std::cout << "Book with ID " << bookID << " not found.\n";
+                }
                 break;
             }
             case 2: {
-                // Add Member
                 std::string name, address, email;
                 std::cout << "Enter Member Name: ";
-                std::cin.ignore(); // Ignore newline character from previous input
+                std::cin.ignore();
                 std::getline(std::cin, name);
                 std::cout << "Enter Member Address: ";
                 std::getline(std::cin, address);
@@ -270,11 +372,9 @@ int main() {
                 std::getline(std::cin, email);
 
                 library.addMember(name, address, email);
-                std::cout << "Member added successfully.\n";
                 break;
             }
             case 3: {
-                // Issue Book to Member
                 int memberID, bookID;
                 std::cout << "Enter Member ID: ";
                 std::cin >> memberID;
@@ -285,7 +385,6 @@ int main() {
                 break;
             }
             case 4: {
-                // Return Book from Member
                 int memberID, bookID;
                 std::cout << "Enter Member ID: ";
                 std::cin >> memberID;
@@ -296,7 +395,6 @@ int main() {
                 break;
             }
             case 5: {
-                // Display Books Borrowed by Member
                 int memberID;
                 std::cout << "Enter Member ID: ";
                 std::cin >> memberID;
@@ -305,7 +403,6 @@ int main() {
                 break;
             }
             case 6: {
-                // Calculate Fine for Overdue Books
                 int memberID;
                 std::cout << "Enter Member ID: ";
                 std::cin >> memberID;
